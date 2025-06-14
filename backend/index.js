@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import connectDB from './db/db.js';
-import socketHandler from './socket/socket.js'; // ✅ import here
+import socketHandler from './socket/socket.js';
 
 dotenv.config();
 connectDB();
@@ -24,10 +24,20 @@ const io = new Server(httpServer, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+    skipMiddlewares: true,
+  },
 });
 
-// ✅ Pass `io` to external handler
+// Attach socket handler
 socketHandler(io);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
