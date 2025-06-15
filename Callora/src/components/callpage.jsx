@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
-import VideoPlayer from '../components/VideoPlayer';
+import VideoPlayer from './videoplayer';
 import ChatBox from './chatbot';
 import Controls from './controlls';
 import RoomControls from './newcontrol';
@@ -520,7 +520,7 @@ export default function CallPage() {
             className={`${getVideoClasses(socket.id)} transition-all duration-300`}
             onClick={() => toggleFocusVideo(socket.id)}
           >
-            <VideoPlayer 
+            <VideoPlayer
               stream={localStream} 
               isLocal 
               ref={localVideoRef} 

@@ -1,5 +1,4 @@
 import { useEffect, useRef, forwardRef } from 'react';
-
 const VideoPlayer = forwardRef(({ 
   stream, 
   isLocal = false, 
