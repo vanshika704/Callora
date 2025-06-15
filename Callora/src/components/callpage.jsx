@@ -5,10 +5,8 @@ import { useSocket } from '../context/SocketContext';
 import VideoPlayer from '../components/VideoPlayer';
 import ChatBox from './chatbot';
 import Controls from './controlls';
-import ParticipantList from './newparticipant';
 import RoomControls from './newcontrol';
 import ConnectionStatus from './connectionStatus';
-import useUsername from './username';
 
 const iceServers = {
   iceServers: [
@@ -44,7 +42,6 @@ export default function CallPage() {
     isLocked: false,
     isMuted: false
   });
-   const [username] = useUsername();
   const [isCreator, setIsCreator] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [activeSpeaker, setActiveSpeaker] = useState(null);
@@ -296,45 +293,74 @@ export default function CallPage() {
   const shareScreen = async () => {
     try {
       if (isScreenSharing) {
+        // Stop screen sharing and revert to camera
         screenStreamRef.current.getTracks().forEach(track => track.stop());
         screenStreamRef.current = null;
         setIsScreenSharing(false);
         
+        // Get the camera stream again
         const stream = await getUserMedia();
         if (!stream) return;
         
+        // Replace tracks in all peer connections
         Object.keys(peerConnections.current).forEach(userId => {
           const pc = peerConnections.current[userId];
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) {
-            const videoTrack = stream.getVideoTracks()[0];
-            sender.replaceTrack(videoTrack);
-          }
+          const senders = pc.getSenders();
+          
+          senders.forEach(sender => {
+            if (sender.track?.kind === 'video') {
+              const videoTrack = stream.getVideoTracks()[0];
+              if (videoTrack) {
+                sender.replaceTrack(videoTrack)
+                  .catch(err => console.error('Error replacing track:', err));
+              }
+            }
+          });
         });
+        
+        // Update local video display
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        setLocalStream(stream);
         return;
       }
 
+      // Start screen sharing
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: 'always' },
         audio: false,
       });
+      
       screenStreamRef.current = screenStream;
       setIsScreenSharing(true);
 
+      // Replace video tracks in all peer connections
       const videoTrack = screenStream.getVideoTracks()[0];
       Object.keys(peerConnections.current).forEach(userId => {
         const pc = peerConnections.current[userId];
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(videoTrack);
-        }
+        const senders = pc.getSenders();
+        
+        senders.forEach(sender => {
+          if (sender.track?.kind === 'video') {
+            sender.replaceTrack(videoTrack)
+              .catch(err => console.error('Error replacing track:', err));
+          }
+        });
       });
 
+      // Update local video display to show screen share preview
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = new MediaStream([videoTrack]);
+      }
+
+      // Handle when screen sharing is stopped by browser UI
       videoTrack.onended = () => {
         shareScreen();
       };
     } catch (error) {
       console.error('Error sharing screen:', error);
+      setIsScreenSharing(false);
     }
   };
 
@@ -474,9 +500,9 @@ export default function CallPage() {
   };
 
   return (
-    <div className="flex h-screen bg-white text-gray-800 overflow-hidden">
+    <div className="flex h-screen w-screen bg-white text-gray-800 overflow-hidden">
       <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-teal-200 flex justify-between items-center bg-teal-600 text-white">
+        <div className="p-4 border-b border-teal-200 w-screen flex justify-between items-center bg-teal-600 text-white">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold">Room: {roomId}</h2>
             <ConnectionStatus status={connectionStatus} />
@@ -514,7 +540,7 @@ export default function CallPage() {
             >
               <VideoPlayer 
                 stream={stream} 
-                username={username}
+                username={`User ${id.slice(0, 5)}`}
                 isSpeaking={activeSpeaker === id}
                 isFocused={focusedVideo === id}
                 emoji={emojiReactions[id]}
@@ -539,21 +565,11 @@ export default function CallPage() {
         </div>
       </div>
       
-      <div className="w-80 border-l border-teal-200 flex flex-col bg-teal-50">
-        <ParticipantList 
-          participants={participants} 
-          currentUserId={socket?.id}
-          isCreator={isCreator}
-          activeSpeaker={activeSpeaker}
-          focusedVideo={focusedVideo}
-          onFocusVideo={toggleFocusVideo}
-        />
+     
         <div className="flex-1 overflow-hidden flex flex-col">
           <ChatBox roomId={roomId} socket={socket} />
         </div>
       </div>
-    </div>
+    
   );
 }
-
-
