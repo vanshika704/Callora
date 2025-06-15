@@ -1,5 +1,4 @@
 
-
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
@@ -9,6 +8,7 @@ import Controls from './controlls';
 import ParticipantList from './newparticipant';
 import RoomControls from './newcontrol';
 import ConnectionStatus from './connectionStatus';
+import useUsername from './username';
 
 const iceServers = {
   iceServers: [
@@ -44,9 +44,12 @@ export default function CallPage() {
     isLocked: false,
     isMuted: false
   });
+   const [username] = useUsername();
   const [isCreator, setIsCreator] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [focusedVideo, setFocusedVideo] = useState(null);
+  const [emojiReactions, setEmojiReactions] = useState({});
   const peerConnections = useRef({});
   const screenStreamRef = useRef(null);
   const retryCount = useRef(0);
@@ -269,6 +272,25 @@ export default function CallPage() {
     if (activeSpeaker === userId) {
       setActiveSpeaker(null);
     }
+    
+    if (focusedVideo === userId) {
+      setFocusedVideo(null);
+    }
+  };
+
+  const handleEmojiReaction = ({ userId, emoji }) => {
+    setEmojiReactions(prev => ({
+      ...prev,
+      [userId]: emoji
+    }));
+    
+    setTimeout(() => {
+      setEmojiReactions(prev => {
+        const updated = { ...prev };
+        delete updated[userId];
+        return updated;
+      });
+    }, 2000);
   };
 
   const shareScreen = async () => {
@@ -333,8 +355,17 @@ export default function CallPage() {
     navigate('/');
   };
 
+  const toggleFocusVideo = (userId) => {
+    setFocusedVideo(focusedVideo === userId ? null : userId);
+  };
+
+  const sendEmoji = (emoji) => {
+    if (socket && roomId) {
+      socket.emit('send-emoji', { roomId, emoji });
+    }
+  };
+
   const cleanup = () => {
-    // Stop all media tracks
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
@@ -342,11 +373,9 @@ export default function CallPage() {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
     }
     
-    // Close all peer connections
     Object.values(peerConnections.current).forEach(pc => pc.close());
     peerConnections.current = {};
     
-    // Clean up audio analysers
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
@@ -355,7 +384,6 @@ export default function CallPage() {
     }
     analysersRef.current = {};
     
-    // Notify server
     if (socket) {
       socket.emit('leave-room', roomId);
     }
@@ -379,7 +407,6 @@ export default function CallPage() {
         }
         setConnectionStatus('connected');
         
-        // Start checking speaking status
         checkSpeakingStatus();
       });
     };
@@ -424,7 +451,8 @@ export default function CallPage() {
       'promoted-to-creator': () => {
         setIsCreator(true);
         alert('You are now the room creator');
-      }
+      },
+      'receive-emoji': handleEmojiReaction
     };
 
     Object.entries(eventHandlers).forEach(([event, handler]) => {
@@ -438,12 +466,17 @@ export default function CallPage() {
     };
   }, [socket, localStream, roomId, participants]);
 
+  const getVideoClasses = (userId) => {
+    if (!focusedVideo) return 'w-full h-full';
+    return userId === focusedVideo 
+      ? 'w-full h-full row-span-2 col-span-2 z-10' 
+      : 'w-48 h-36';
+  };
+
   return (
-    <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
-      {/* Main video grid */}
+    <div className="flex h-screen bg-white text-gray-800 overflow-hidden">
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="p-3 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+        <div className="p-4 border-b border-teal-200 flex justify-between items-center bg-teal-600 text-white">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold">Room: {roomId}</h2>
             <ConnectionStatus status={connectionStatus} />
@@ -456,47 +489,71 @@ export default function CallPage() {
           />
         </div>
         
-        {/* Video grid */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto bg-gray-900">
-          <VideoPlayer 
-            stream={localStream} 
-            isLocal 
-            ref={localVideoRef} 
-            username="You"
-            isSpeaking={activeSpeaker === socket.id}
-            isMuted={roomSettings.isMuted}
-          />
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto bg-white">
+          <div 
+            className={`${getVideoClasses(socket.id)} transition-all duration-300`}
+            onClick={() => toggleFocusVideo(socket.id)}
+          >
+            <VideoPlayer 
+              stream={localStream} 
+              isLocal 
+              ref={localVideoRef} 
+              username="You"
+              isSpeaking={activeSpeaker === socket.id}
+              isMuted={roomSettings.isMuted}
+              isFocused={focusedVideo === socket.id}
+              emoji={emojiReactions[socket.id]}
+            />
+          </div>
           
           {Object.entries(remoteStreams).map(([id, stream]) => (
-            <VideoPlayer 
+            <div 
               key={id} 
-              stream={stream} 
-              username={`User ${id.slice(0, 5)}`}
-              isSpeaking={activeSpeaker === id}
-            />
+              className={`${getVideoClasses(id)} transition-all duration-300`}
+              onClick={() => toggleFocusVideo(id)}
+            >
+              <VideoPlayer 
+                stream={stream} 
+                username={username}
+                isSpeaking={activeSpeaker === id}
+                isFocused={focusedVideo === id}
+                emoji={emojiReactions[id]}
+              />
+            </div>
           ))}
         </div>
         
-        {/* Controls */}
-        <Controls 
-          localStream={localStream} 
-          onScreenShare={shareScreen}
-          isScreenSharing={isScreenSharing}
-          isMuted={roomSettings.isMuted}
-          onToggleMute={() => updateRoomSettings({ isMuted: !roomSettings.isMuted })}
-        />
+        <div className="p-4 bg-teal-50 border-t border-teal-200">
+          <Controls 
+            localStream={localStream} 
+            onScreenShare={shareScreen}
+            isScreenSharing={isScreenSharing}
+            isMuted={roomSettings.isMuted}
+            onToggleMute={() => updateRoomSettings({ isMuted: !roomSettings.isMuted })}
+            onResetFocus={() => setFocusedVideo(null)}
+            hasFocusedVideo={!!focusedVideo}
+            socket={socket}
+            roomId={roomId}
+            sendEmoji={sendEmoji}
+          />
+        </div>
       </div>
       
-      {/* Sidebar */}
-      <div className="w-80 border-l border-gray-700 flex flex-col bg-gray-800">
+      <div className="w-80 border-l border-teal-200 flex flex-col bg-teal-50">
         <ParticipantList 
           participants={participants} 
           currentUserId={socket?.id}
           isCreator={isCreator}
           activeSpeaker={activeSpeaker}
+          focusedVideo={focusedVideo}
+          onFocusVideo={toggleFocusVideo}
         />
-        <ChatBox roomId={roomId} socket={socket} />
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <ChatBox roomId={roomId} socket={socket} />
+        </div>
       </div>
     </div>
   );
 }
+
+

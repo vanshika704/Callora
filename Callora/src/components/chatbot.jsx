@@ -32,7 +32,7 @@ import { useEffect, useRef, useState } from 'react';
   };
 
   return (
-    <div className="flex-1 flex flex-col border-t border-gray-700">
+    <div className="flex-1 flex flex-col border-t border-teal-700">
       <div className="flex-1 overflow-y-auto p-4">
         {messages.map((msg, idx) => (
           <div key={idx} className={`mb-3 ${msg.isSystem ? 'text-center text-gray-400 text-sm' : ''}`}>
@@ -44,7 +44,7 @@ import { useEffect, useRef, useState } from 'react';
               </div>
             )}
             <div className={`p-2 rounded-lg inline-block ${
-              msg.sender === socket?.id ? 'bg-blue-600 text-white' : 'bg-gray-700'
+              msg.sender === socket?.id ? 'bg-teal-600 text-white' : 'bg-gray-700'
             }`}>
               {msg.message}
             </div>
@@ -57,9 +57,9 @@ import { useEffect, useRef, useState } from 'react';
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <div className="p-3 bg-gray-900 flex gap-2">
+      <div className="p-3 bg-teal-700 flex gap-2">
         <input
-          className="flex-1 bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 bg-teal-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-50"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
@@ -67,7 +67,7 @@ import { useEffect, useRef, useState } from 'react';
         />
         <button
           onClick={sendMessage}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+          className="bg-teal-600 hover:bg-teal-400 text-white px-4 py-2 rounded transition-colors"
           disabled={!input.trim()}
         >
           Send
