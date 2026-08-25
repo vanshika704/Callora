@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
-import VideoPlayer from './videoplayer';
+import VideoPlayer from './videoPlayer';
 import ChatBox from './chatbot';
 import Controls from './controlls';
 import RoomControls from './newcontrol';

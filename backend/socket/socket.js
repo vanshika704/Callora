@@ -1,11 +1,11 @@
 const activeRooms = new Map(); // roomId -> { users: Set, settings: { isLocked, isMuted, creator } }
-
+// socket handler function providing various features
 export default function socketHandler(io) {
-  io.on('connection', (socket) => {
+  io.on('connection', (socket) => { // io.on connection 
     console.log('🟢 User connected:', socket.id);
 
     // Helper function to get room by socket ID
-    const getRoomBySocketId = (socketId) => {
+    const getRoomBySocketId = (socketId) => { // finding rooms by socket id 
       for (const [roomId, room] of activeRooms.entries()) {
         if (room.users.has(socketId)) {
           return roomId;
