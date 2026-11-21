@@ -8,7 +8,7 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null); // use state socket 
 
   useEffect(() => {
-    const newSocket = io('https://vistora-nzjq.onrender.com'); // use effect is getting the socket from the server ie backend
+    const newSocket = io('https://callora-pd9v.onrender.com'); // use effect is getting the socket from the server ie backend
     setSocket(newSocket); //socket ko pass krdiya
 ///////////////////////
     return () => {
